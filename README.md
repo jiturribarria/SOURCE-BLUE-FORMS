@@ -1,12 +1,8 @@
 # SOURCE-BLUE-FORMS
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Test Page</title>
-  </head>
-  <body>
-    <h1>It works 🎉</h1>
-    <p>If you see this, GitHub Pages is working.</p>
-    <a href="second.html">Go to second page</a>
-  </body>
-</html>
+🔗 Online Forms
+
+Delivery Form
+https://jiturribarria.github.io/SOURCE-BLUE-FORMS/delivery_form_final.html
+
+Receiving Form
+https://jiturribarria.github.io/SOURCE-BLUE-FORMS/receiving_form_final.html
