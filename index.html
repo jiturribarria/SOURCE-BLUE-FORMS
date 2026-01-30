@@ -752,19 +752,31 @@
                 const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const filename = `Receiving_${timestamp}_${vendor}.pdf`;
 
-                // Check if iOS/Safari - use blob URL approach for better compatibility
+                // Check if iOS/Safari - use Web Share API for native share sheet
                 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-                if (isIOS || isSafari) {
-                    // For iOS Safari: open PDF in new tab, user can then use share sheet to save
+                if ((isIOS || isSafari) && navigator.share) {
+                    // For iOS Safari: use Web Share API for native share sheet
                     const pdfBlob = pdf.output('blob');
-                    const blobUrl = URL.createObjectURL(pdfBlob);
-                    window.open(blobUrl, '_blank');
-                    showMessage('✓ PDF opened! Tap the Share button to save or send.', 'success');
-                    // Clean up blob URL after a delay
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+                    try {
+                        await navigator.share({
+                            files: [pdfFile],
+                            title: 'Material Receiving Form'
+                        });
+                        showMessage('✓ PDF shared successfully!', 'success');
+                    } catch (shareError) {
+                        if (shareError.name === 'AbortError') {
+                            showMessage('Share cancelled.', 'error');
+                        } else {
+                            // Fallback: direct save
+                            pdf.save(filename);
+                            showMessage('✓ PDF downloaded!', 'success');
+                        }
+                    }
                 } else {
                     // For other browsers: direct download
                     pdf.save(filename);
