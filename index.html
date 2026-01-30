@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Receiving Form - SourceBlue</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #89CFF0 0%, #4A90C2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: white;
+            color: #333;
+            padding: 20px 20px 30px;
+            text-align: center;
+            border-bottom: 4px solid #89CFF0;
+        }
+        .logo { margin-bottom: 15px; }
+        .logo img { height: 60px; width: auto; }
+        .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #4A90C2; }
+        .header p { font-size: 14px; color: #666; }
+        .company-info {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 13px;
+            color: #333;
+            text-align: center;
+        }
+        .company-info strong { display: block; margin-bottom: 5px; }
+        .legal-notice {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            margin: 20px 20px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #856404;
+        }
+        .legal-notice strong { display: block; margin-bottom: 8px; color: #856404; }
+        .form-section { padding: 30px 20px; }
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #4A90C2;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .form-group { margin-bottom: 24px; }
+        label { display: block; font-weight: 600; color: #333; margin-bottom: 8px; font-size: 14px; }
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4A90C2;
+            box-shadow: 0 0 0 3px rgba(74, 144, 194, 0.1);
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .checkbox-group { display: flex; gap: 30px; align-items: center; margin-top: 10px; }
+        .checkbox-option { display: flex; align-items: center; gap: 8px; }
+        .checkbox-option input[type="checkbox"] { width: 24px; height: 24px; cursor: pointer; }
+        .checkbox-option label { margin: 0; font-weight: 600; cursor: pointer; }
+
+        /* Button Styles */
+        .button-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .download-btn {
+            flex: 1;
+            min-width: 200px;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        .download-btn:active { transform: translateY(0); }
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-pdf {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+        }
+        .btn-excel {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            color: white;
+        }
+        .btn-icon { font-size: 20px; }
+
+        .success-message {
+            display: none;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .success-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .success-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #4A90C2;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+        .signature-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
+        .signature-box {
+            border: 2px solid #4A90C2;
+            border-radius: 8px;
+            background: white;
+            margin-top: 10px;
+            position: relative;
+            touch-action: none;
+        }
+        .signature-canvas { width: 100%; height: 150px; cursor: crosshair; touch-action: none; }
+        .signature-label { display: block; font-weight: 600; color: #333; margin-bottom: 8px; font-size: 14px; }
+        .signature-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        .clear-signature-btn {
+            padding: 8px 16px;
+            background: white;
+            color: #dc3545;
+            border: 2px solid #dc3545;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .clear-signature-btn:hover { background: #dc3545; color: white; }
+        .image-upload-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
+        .image-upload-box {
+            border: 2px dashed #4A90C2;
+            border-radius: 8px;
+            padding: 30px 20px;
+            text-align: center;
+            background: #f8f9fa;
+            margin-top: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .image-upload-box:hover { background: #e3f2fd; border-color: #1565c0; }
+        .image-upload-box input[type="file"] { display: none; }
+        .upload-icon { font-size: 48px; margin-bottom: 10px; }
+        .image-preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .image-preview {
+            position: relative;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 1;
+        }
+        .image-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .remove-image-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .certification-text {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #333;
+            border-left: 4px solid #4A90C2;
+        }
+        .validation-error { color: #dc3545; font-size: 12px; margin-top: 5px; }
+        .field-error { border-color: #dc3545 !important; }
+
+        @media (max-width: 600px) {
+            .row { grid-template-columns: 1fr; }
+            .checkbox-group { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .button-container { flex-direction: column; }
+            .download-btn { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="formContainer">
+        <div class="header">
+            <div class="logo">
+                <img src="https://via.placeholder.com/200x60?text=SourceBlue" alt="SourceBlue Logo" id="logoImg">
+            </div>
+            <h1>📦 RECEIPT VERIFICATION FORM</h1>
+            <p>Material Receiving &amp; Certification</p>
+        </div>
+
+        <div class="company-info">
+            <strong>SourceBlue San Diego</strong>
+            15378 Avenue of Science, STE. 100<br>
+            San Diego, CA 92128<br>
+            Phone: 760-672-7846
+        </div>
+
+        <div class="legal-notice">
+            <strong>⚠️ IMPORTANT NOTICE:</strong>
+            • Visible/External Damage to be reported within two (2) Calendar Days.<br>
+            • Internal Damage to be reported within fourteen (14) Calendar Days.<br>
+            • If left un-responded, after a duration of five (5) calendar days, we will proceed with this as a confirmation the delivery has been received undamaged and in compliance with the submittals and tickets.
+        </div>
+
+        <div class="form-section">
+            <div class="info-box">
+                ℹ️ Fill out the form below, then use the buttons to download your PDF record and/or Excel tracking file.
+            </div>
+
+            <form id="receivingForm">
+                <h3 class="section-title">General Information</h3>
+
+                <div class="form-group">
+                    <label for="projectName">Project Name *</label>
+                    <input type="text" id="projectName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="vendor">Vendor *</label>
+                    <input type="text" id="vendor" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="vendorPO">Vendor PO # *</label>
+                    <input type="text" id="vendorPO" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="equipment">Equipment / Product *</label>
+                    <input type="text" id="equipment" required>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label for="date">Date of Receipt *</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Time</label>
+                        <input type="time" id="time">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Receiving Location *</label>
+                    <input type="text" id="location" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="quantityPallets">Quantity of Pallets/Sections/Units *</label>
+                    <input type="text" id="quantityPallets" required>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 2px solid #e0e0e0;">
+
+                <h3 class="section-title">Delivery Information</h3>
+
+                <div class="form-group">
+                    <label>1) Package contents match Shipping List or Bill of Lading? *</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="matchYes" name="match" value="YES" onchange="handleCheckbox('match', 'matchYes')">
+                            <label for="matchYes">YES</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="matchNo" name="match" value="NO" onchange="handleCheckbox('match', 'matchNo')">
+                            <label for="matchNo">NO</label>
+                        </div>
+                    </div>
+                    <small style="color: #666; font-size: 12px; font-style: italic;">If NO, explain in comments below</small>
+                </div>
+
+                <div class="form-group">
+                    <label>2) Package or content damaged? *</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="damagedYes" name="damaged" value="YES" onchange="handleCheckbox('damaged', 'damagedYes')">
+                            <label for="damagedYes">YES</label>
+                        </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="damagedNo" name="damaged" value="NO" onchange="handleCheckbox('damaged', 'damagedNo')">
+                            <label for="damagedNo">NO</label>
+                        </div>
+                    </div>
+                    <small style="color: #666; font-size: 12px; font-style: italic;">If YES, notify immediately and provide description in comments</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="comments">Comments</label>
+                    <textarea id="comments" rows="4" placeholder="Enter any additional comments or explanations here..."></textarea>
+                </div>
+
+                <div class="certification-text">
+                    <strong>Certification Statement:</strong><br>
+                    This is to certify that the materials described above have been jointly received and found to be without damage, visible or otherwise. This is to further certify that the materials being received are those that have been submitted and approved for the Project.
+                    <br><br>
+                    <strong>By signature of this document:</strong> Formal ownership and all corresponding responsibility for the care and custody of these goods belongs to the installing party until final acceptance of the equipment by the owner, including but not limited to storage, removal from storage, disposal of debris, protection from the elements, installation, all necessary materials for installation, make ready for startup, startup or assistance as required and warranty support as previously agreed.
+                </div>
+
+                <div class="image-upload-section">
+                    <h3 class="section-title">📸 Attach Photos (Optional)</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Add photos of materials, delivery condition, or packaging</p>
+
+                    <div class="image-upload-box" onclick="document.getElementById('imageUpload').click()">
+                        <div class="upload-icon">📷</div>
+                        <p style="font-weight: 600; color: #4A90C2; margin-bottom: 5px;">Tap to Add Photos</p>
+                        <p style="font-size: 13px; color: #666;">Camera or Photo Library</p>
+                        <input type="file" id="imageUpload" accept="image/*" multiple capture="environment">
+                    </div>
+
+                    <div id="imagePreviewContainer" class="image-preview-container"></div>
+                </div>
+
+                <div class="signature-section">
+                    <h3 style="margin-bottom: 20px; color: #333;">Required Signatures</h3>
+
+                    <div class="form-group">
+                        <label class="signature-label">Vendor/Deliverer Signature *</label>
+                        <div class="signature-box">
+                            <canvas id="vendorSignature" class="signature-canvas"></canvas>
+                        </div>
+                        <div class="signature-buttons">
+                            <button type="button" class="clear-signature-btn" onclick="clearSignature('vendorSignature')">Clear</button>
+                        </div>
+                        <input type="text" placeholder="Print Name" id="vendorName" style="margin-top: 10px;" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="signature-label">JV Representative Signature *</label>
+                        <div class="signature-box">
+                            <canvas id="jvSignature" class="signature-canvas"></canvas>
+                        </div>
+                        <div class="signature-buttons">
+                            <button type="button" class="clear-signature-btn" onclick="clearSignature('jvSignature')">Clear</button>
+                        </div>
+                        <input type="text" placeholder="Print Name" id="jvName" style="margin-top: 10px;" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="signature-label">Receiver Signature *</label>
+                        <div class="signature-box">
+                            <canvas id="receiverSignature" class="signature-canvas"></canvas>
+                        </div>
+                        <div class="signature-buttons">
+                            <button type="button" class="clear-signature-btn" onclick="clearSignature('receiverSignature')">Clear</button>
+                        </div>
+                        <input type="text" placeholder="Print Name" id="receiverName" style="margin-top: 10px;" required>
+                    </div>
+                </div>
+
+                <!-- TWO SEPARATE DOWNLOAD BUTTONS -->
+                <div class="button-container">
+                    <button type="button" class="download-btn btn-pdf" id="downloadPdfBtn" onclick="downloadPDF()">
+                        <span class="btn-icon">📄</span>
+                        Download PDF
+                    </button>
+                    <button type="button" class="download-btn btn-excel" id="downloadExcelBtn" onclick="downloadExcel()">
+                        <span class="btn-icon">📊</span>
+                        Download Excel
+                    </button>
+                </div>
+
+                <div class="success-message" id="successMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // GLOBAL VARIABLES
+        // ============================================
+        const EXCEL_FILENAME = 'SourceBlue_Tracking.xlsx';
+        const signatureCanvases = {};
+        let uploadedImages = [];
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        window.addEventListener('load', function() {
+            setupSignature('vendorSignature');
+            setupSignature('jvSignature');
+            setupSignature('receiverSignature');
+
+            // Set current date and time
+            document.getElementById('date').valueAsDate = new Date();
+            const now = new Date();
+            document.getElementById('time').value =
+                now.getHours().toString().padStart(2, '0') + ':' +
+                now.getMinutes().toString().padStart(2, '0');
+        });
+
+        // ============================================
+        // SIGNATURE HANDLING
+        // ============================================
+        function setupSignature(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches ? e.touches[0] : e;
+                return {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+            }
+
+            function startDrawing(e) {
+                e.preventDefault();
+                isDrawing = true;
+                const pos = getPos(e);
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', draw);
+            canvas.addEventListener('touchend', stopDrawing);
+
+            signatureCanvases[canvasId] = canvas;
+        }
+
+        function clearSignature(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // ============================================
+        // IMAGE HANDLING
+        // ============================================
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        uploadedImages.push({
+                            data: event.target.result,
+                            name: file.name,
+                            type: file.type
+                        });
+                        displayImages();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            e.target.value = '';
+        });
+
+        function displayImages() {
+            const container = document.getElementById('imagePreviewContainer');
+            container.innerHTML = '';
+            uploadedImages.forEach((img, index) => {
+                const div = document.createElement('div');
+                div.className = 'image-preview';
+                div.innerHTML = `
+                    <img src="${img.data}" alt="Photo ${index + 1}">
+                    <button type="button" class="remove-image-btn" onclick="removeImage(${index})">×</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            displayImages();
+        }
+
+        // ============================================
+        // CHECKBOX HANDLING
+        // ============================================
+        function handleCheckbox(groupName, checkedId) {
+            const checkboxes = document.getElementsByName(groupName);
+            checkboxes.forEach(cb => {
+                if (cb.id !== checkedId) {
+                    cb.checked = false;
+                }
+            });
+        }
+
+        // ============================================
+        // FORM VALIDATION
+        // ============================================
+        function validateForm() {
+            const requiredFields = [
+                'projectName', 'vendor', 'vendorPO', 'equipment',
+                'date', 'location', 'quantityPallets',
+                'vendorName', 'jvName', 'receiverName'
+            ];
+
+            let isValid = true;
+            let firstInvalid = null;
+
+            requiredFields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                const value = field.value.trim();
+
+                if (!value) {
+                    field.classList.add('field-error');
+                    isValid = false;
+                    if (!firstInvalid) firstInvalid = field;
+                } else {
+                    field.classList.remove('field-error');
+                }
+            });
+
+            // Check if at least one checkbox is selected for each group
+            const matchYes = document.getElementById('matchYes').checked;
+            const matchNo = document.getElementById('matchNo').checked;
+            if (!matchYes && !matchNo) {
+                isValid = false;
+            }
+
+            const damagedYes = document.getElementById('damagedYes').checked;
+            const damagedNo = document.getElementById('damagedNo').checked;
+            if (!damagedYes && !damagedNo) {
+                isValid = false;
+            }
+
+            if (!isValid && firstInvalid) {
+                firstInvalid.focus();
+                showMessage('Please fill in all required fields.', 'error');
+            }
+
+            return isValid;
+        }
+
+        // ============================================
+        // COLLECT FORM DATA
+        // ============================================
+        function collectFormData() {
+            return {
+                'Date': document.getElementById('date').value,
+                'Time': document.getElementById('time').value,
+                'Project Name': document.getElementById('projectName').value,
+                'Vendor': document.getElementById('vendor').value,
+                'Vendor PO#': document.getElementById('vendorPO').value,
+                'Equipment/Product': document.getElementById('equipment').value,
+                'Location': document.getElementById('location').value,
+                'Quantity Pallets/Units': document.getElementById('quantityPallets').value,
+                'Contents Match?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
+                'Package Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
+                'Comments': document.getElementById('comments').value,
+                'Vendor Signer Name': document.getElementById('vendorName').value,
+                'JV Rep Signer Name': document.getElementById('jvName').value,
+                'Receiver Signer Name': document.getElementById('receiverName').value,
+                'Photos Attached': uploadedImages.length
+            };
+        }
+
+        // ============================================
+        // SHOW MESSAGE
+        // ============================================
+        function showMessage(text, type) {
+            const msgEl = document.getElementById('successMessage');
+            msgEl.textContent = text;
+            msgEl.className = 'success-message ' + type;
+            msgEl.style.display = 'block';
+            setTimeout(() => {
+                msgEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // ============================================
+        // DOWNLOAD PDF - Single Responsibility
+        // ============================================
+        async function downloadPDF() {
+            if (!validateForm()) return;
+
+            const btn = document.getElementById('downloadPdfBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
+            btn.disabled = true;
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const formElement = document.querySelector('.container');
+
+                // Hide buttons temporarily for capture
+                const buttonContainer = document.querySelector('.button-container');
+                const successMessage = document.getElementById('successMessage');
+                buttonContainer.style.display = 'none';
+                successMessage.style.display = 'none';
+
+                const canvas = await html2canvas(formElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    allowTaint: true
+                });
+
+                // Restore buttons
+                buttonContainer.style.display = 'flex';
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const imgWidth = 210;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= 297;
+
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= 297;
+                }
+
+                // Add uploaded images on separate pages
+                if (uploadedImages.length > 0) {
+                    for (let i = 0; i < uploadedImages.length; i++) {
+                        pdf.addPage();
+                        const img = uploadedImages[i];
+                        pdf.setFontSize(12);
+                        pdf.setTextColor(100);
+                        pdf.text(`Photo ${i + 1} of ${uploadedImages.length}`, 105, 15, { align: 'center' });
+
+                        const maxWidth = 180;
+                        const maxHeight = 250;
+                        pdf.addImage(img.data, 'JPEG', 15, 25, maxWidth, maxHeight, undefined, 'NONE');
+                    }
+                }
+
+                // Generate filename and download
+                const timestamp = new Date().toISOString().slice(0,10);
+                const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+                const filename = `Receiving_${timestamp}_${vendor}.pdf`;
+
+                // Direct download - works on all platforms
+                pdf.save(filename);
+
+                showMessage('✓ PDF downloaded successfully!', 'success');
+
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                showMessage('Error generating PDF. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // DOWNLOAD EXCEL - Single Responsibility
+        // ============================================
+        function downloadExcel() {
+            if (!validateForm()) return;
+
+            const btn = document.getElementById('downloadExcelBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
+            btn.disabled = true;
+
+            try {
+                const formData = collectFormData();
+
+                // Try to read existing file from localStorage
+                let wb;
+                const storedFile = localStorage.getItem(EXCEL_FILENAME);
+
+                if (storedFile) {
+                    try {
+                        const binaryString = atob(storedFile);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        wb = XLSX.read(bytes, {type: 'array'});
+                    } catch (e) {
+                        console.warn('Could not read stored file, creating new one');
+                        wb = XLSX.utils.book_new();
+                    }
+                } else {
+                    wb = XLSX.utils.book_new();
+                }
+
+                // Get or create Receiving sheet
+                let ws;
+                if (wb.Sheets && wb.Sheets['Receiving']) {
+                    ws = wb.Sheets['Receiving'];
+                    const existingData = XLSX.utils.sheet_to_json(ws);
+                    const allData = existingData.concat([formData]);
+                    ws = XLSX.utils.json_to_sheet(allData);
+                } else {
+                    ws = XLSX.utils.json_to_sheet([formData]);
+                }
+
+                // Set column widths
+                ws['!cols'] = [
+                    {wch: 12}, {wch: 8}, {wch: 25}, {wch: 20}, {wch: 15},
+                    {wch: 30}, {wch: 20}, {wch: 20}, {wch: 15},
+                    {wch: 15}, {wch: 40}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 15}
+                ];
+
+                if (wb.Sheets && wb.Sheets['Receiving']) {
+                    wb.Sheets['Receiving'] = ws;
+                } else {
+                    XLSX.utils.book_append_sheet(wb, ws, "Receiving");
+                }
+
+                // Save to localStorage for persistence
+                try {
+                    const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'binary'});
+                    localStorage.setItem(EXCEL_FILENAME, btoa(wbout));
+                } catch (e) {
+                    console.warn('Could not save to localStorage:', e);
+                }
+
+                // Direct download
+                XLSX.writeFile(wb, EXCEL_FILENAME);
+
+                showMessage('✓ Excel file downloaded successfully!', 'success');
+
+            } catch (error) {
+                console.error('Excel generation error:', error);
+                showMessage('Error generating Excel file. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // RESET FORM (Optional utility)
+        // ============================================
+        function resetForm() {
+            document.getElementById('receivingForm').reset();
+            document.getElementById('date').valueAsDate = new Date();
+            const now = new Date();
+            document.getElementById('time').value =
+                now.getHours().toString().padStart(2, '0') + ':' +
+                now.getMinutes().toString().padStart(2, '0');
+            clearSignature('vendorSignature');
+            clearSignature('jvSignature');
+            clearSignature('receiverSignature');
+            uploadedImages = [];
+            displayImages();
+        }
+    </script>
+</body>
+</html>
