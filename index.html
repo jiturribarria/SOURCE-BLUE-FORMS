@@ -32,6 +32,15 @@
         }
         .logo { margin-bottom: 15px; }
         .logo img { height: 60px; width: auto; }
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #4A90C2;
+            letter-spacing: -1px;
+        }
+        .logo-text span {
+            color: #89CFF0;
+        }
         .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #4A90C2; }
         .header p { font-size: 14px; color: #666; }
         .company-info {
@@ -250,7 +259,7 @@
     <div class="container" id="formContainer">
         <div class="header">
             <div class="logo">
-                <img src="https://via.placeholder.com/200x60?text=SourceBlue" alt="SourceBlue Logo" id="logoImg">
+                <div class="logo-text">Source<span>Blue</span></div>
             </div>
             <h1>📦 RECEIPT VERIFICATION FORM</h1>
             <p>Material Receiving &amp; Certification</p>
@@ -317,6 +326,11 @@
                 <div class="form-group">
                     <label for="quantityPallets">Quantity of Pallets/Sections/Units *</label>
                     <input type="text" id="quantityPallets" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="receiverCompany">Receiver Company *</label>
+                    <input type="text" id="receiverCompany" required>
                 </div>
 
                 <hr style="margin: 30px 0; border: none; border-top: 2px solid #e0e0e0;">
@@ -587,7 +601,7 @@
         function validateForm() {
             const requiredFields = [
                 'projectName', 'vendor', 'vendorPO', 'equipment',
-                'date', 'location', 'quantityPallets',
+                'date', 'location', 'quantityPallets', 'receiverCompany',
                 'vendorName', 'jvName', 'receiverName'
             ];
 
@@ -641,6 +655,7 @@
                 'Equipment/Product': document.getElementById('equipment').value,
                 'Location': document.getElementById('location').value,
                 'Quantity Pallets/Units': document.getElementById('quantityPallets').value,
+                'Receiver Company': document.getElementById('receiverCompany').value,
                 'Contents Match?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
                 'Package Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
                 'Comments': document.getElementById('comments').value,
@@ -732,15 +747,29 @@
                     }
                 }
 
-                // Generate filename and download
+                // Generate filename
                 const timestamp = new Date().toISOString().slice(0,10);
                 const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const filename = `Receiving_${timestamp}_${vendor}.pdf`;
 
-                // Direct download - works on all platforms
-                pdf.save(filename);
+                // Check if iOS/Safari - use blob URL approach for better compatibility
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-                showMessage('✓ PDF downloaded successfully!', 'success');
+                if (isIOS || isSafari) {
+                    // For iOS Safari: open PDF in new tab, user can then use share sheet to save
+                    const pdfBlob = pdf.output('blob');
+                    const blobUrl = URL.createObjectURL(pdfBlob);
+                    window.open(blobUrl, '_blank');
+                    showMessage('✓ PDF opened! Tap the Share button to save or send.', 'success');
+                    // Clean up blob URL after a delay
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                } else {
+                    // For other browsers: direct download
+                    pdf.save(filename);
+                    showMessage('✓ PDF downloaded successfully!', 'success');
+                }
 
             } catch (error) {
                 console.error('PDF generation error:', error);
