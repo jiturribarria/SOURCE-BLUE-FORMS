@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -133,6 +134,10 @@
         }
         .btn-excel {
             background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            color: white;
+        }
+        .btn-html-zip {
+            background: linear-gradient(135deg, #4A90C2 0%, #357ABD 100%);
             color: white;
         }
         .btn-icon { font-size: 20px; }
@@ -439,6 +444,10 @@
                     <button type="button" class="download-btn btn-excel" id="downloadExcelBtn" onclick="downloadExcel()">
                         <span class="btn-icon">📊</span>
                         Download Excel
+                    </button>
+                    <button type="button" class="download-btn btn-html-zip" id="downloadHtmlZipBtn" onclick="downloadHtmlZip()">
+                        <span class="btn-icon">📁</span>
+                        Download HTML (ZIP)
                     </button>
                 </div>
 
@@ -854,6 +863,42 @@
             } catch (error) {
                 console.error('Excel generation error:', error);
                 showMessage('Error generating Excel file. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // DOWNLOAD HTML AS ZIP
+        // ============================================
+        async function downloadHtmlZip() {
+            const btn = document.getElementById('downloadHtmlZipBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="btn-icon">⏳</span> Generating...';
+            btn.disabled = true;
+
+            try {
+                const htmlContent = document.documentElement.outerHTML;
+                const fullHtml = '<!DOCTYPE html>\n' + htmlContent;
+
+                const zip = new JSZip();
+                zip.file('index.html', fullHtml);
+
+                const blob = await zip.generateAsync({ type: 'blob' });
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'SourceBlue_ReceivingForm.zip';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
+                showMessage('✓ HTML ZIP downloaded successfully!', 'success');
+            } catch (error) {
+                console.error('ZIP generation error:', error);
+                showMessage('Error generating ZIP file. Please try again.', 'error');
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
