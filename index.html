@@ -680,23 +680,32 @@
         }
 
         // ============================================
-        // PDF DOWNLOAD HELPER - Uses data URI (works on iOS Safari)
+        // PDF DOWNLOAD HELPER - Force download on iOS Safari
         // ============================================
-        function downloadPDFviaDataURI(pdf, filename) {
-            // Get base64 data from PDF
-            const pdfBase64 = pdf.output('datauristring');
+        function downloadPDFforced(pdf, filename) {
+            // Get PDF as array buffer
+            const pdfData = pdf.output('arraybuffer');
 
-            // Create download link
+            // Create blob with octet-stream to FORCE download (not preview)
+            const blob = new Blob([pdfData], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+
+            // Create and click download link
             const link = document.createElement('a');
-            link.href = pdfBase64;
+            link.href = url;
             link.download = filename;
+            link.style.display = 'none';
 
-            // For iOS Safari: must append to body
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
 
-            showMessage('✓ PDF download started!', 'success');
+            // Cleanup after small delay
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 250);
+
+            showMessage('✓ PDF downloading to your Downloads folder!', 'success');
         }
 
         // ============================================
@@ -772,8 +781,8 @@
                 const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const filename = `Receiving_${timestamp}_${vendor}.pdf`;
 
-                // Use data URI method for all browsers (most compatible)
-                downloadPDFviaDataURI(pdf, filename);
+                // Force download (octet-stream prevents Safari from opening PDF viewer)
+                downloadPDFforced(pdf, filename);
 
             } catch (error) {
                 console.error('PDF generation error:', error);
