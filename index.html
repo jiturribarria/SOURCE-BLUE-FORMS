@@ -680,28 +680,23 @@
         }
 
         // ============================================
-        // PDF BLOB DOWNLOAD HELPER (for Safari/iOS)
+        // PDF DOWNLOAD HELPER - Uses data URI (works on iOS Safari)
         // ============================================
-        function downloadPDFviaBlobLink(blob, filename) {
-            // Create a blob URL with octet-stream to force download behavior
-            const downloadBlob = new Blob([blob], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(downloadBlob);
+        function downloadPDFviaDataURI(pdf, filename) {
+            // Get base64 data from PDF
+            const pdfBase64 = pdf.output('datauristring');
 
+            // Create download link
             const link = document.createElement('a');
-            link.href = url;
+            link.href = pdfBase64;
             link.download = filename;
-            link.style.display = 'none';
 
+            // For iOS Safari: must append to body
             document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
 
-            // Cleanup
-            setTimeout(() => {
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }, 100);
-
-            showMessage('✓ PDF download started! Check your Downloads folder.', 'success');
+            showMessage('✓ PDF download started!', 'success');
         }
 
         // ============================================
@@ -777,43 +772,8 @@
                 const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const filename = `Receiving_${timestamp}_${vendor}.pdf`;
 
-                // Check if iOS/Safari
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-                if (isIOS) {
-                    // For iOS/iPadOS: Use Web Share API which provides native "Save to Files" option
-                    const pdfBlob = pdf.output('blob');
-                    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
-
-                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-                        try {
-                            await navigator.share({
-                                files: [pdfFile],
-                                title: 'Material Receiving Form',
-                                text: 'SourceBlue Receipt Verification Form'
-                            });
-                            showMessage('✓ PDF shared/saved successfully!', 'success');
-                        } catch (shareError) {
-                            if (shareError.name !== 'AbortError') {
-                                // User cancelled share - try fallback
-                                downloadPDFviaBlobLink(pdfBlob, filename);
-                            }
-                        }
-                    } else {
-                        // Fallback for older iOS versions
-                        downloadPDFviaBlobLink(pdfBlob, filename);
-                    }
-                } else if (isSafari) {
-                    // For macOS Safari: use blob link approach
-                    const pdfBlob = pdf.output('blob');
-                    downloadPDFviaBlobLink(pdfBlob, filename);
-                } else {
-                    // For other browsers: direct download
-                    pdf.save(filename);
-                    showMessage('✓ PDF downloaded successfully!', 'success');
-                }
+                // Use data URI method for all browsers (most compatible)
+                downloadPDFviaDataURI(pdf, filename);
 
             } catch (error) {
                 console.error('PDF generation error:', error);
