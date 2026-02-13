@@ -680,6 +680,31 @@
         }
 
         // ============================================
+        // PDF BLOB DOWNLOAD HELPER (for Safari/iOS)
+        // ============================================
+        function downloadPDFviaBlobLink(blob, filename) {
+            // Create a blob URL with octet-stream to force download behavior
+            const downloadBlob = new Blob([blob], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(downloadBlob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+
+            document.body.appendChild(link);
+            link.click();
+
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+
+            showMessage('✓ PDF download started! Check your Downloads folder.', 'success');
+        }
+
+        // ============================================
         // DOWNLOAD PDF - Single Responsibility
         // ============================================
         async function downloadPDF() {
@@ -752,19 +777,38 @@
                 const vendor = document.getElementById('vendor').value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const filename = `Receiving_${timestamp}_${vendor}.pdf`;
 
-                // Check if iOS/Safari - use blob URL approach for better compatibility
+                // Check if iOS/Safari
                 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-                if (isIOS || isSafari) {
-                    // For iOS Safari: open PDF in new tab, user can then use share sheet to save
+                if (isIOS) {
+                    // For iOS/iPadOS: Use Web Share API which provides native "Save to Files" option
                     const pdfBlob = pdf.output('blob');
-                    const blobUrl = URL.createObjectURL(pdfBlob);
-                    window.open(blobUrl, '_blank');
-                    showMessage('✓ PDF opened! Tap the Share button to save or send.', 'success');
-                    // Clean up blob URL after a delay
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                        try {
+                            await navigator.share({
+                                files: [pdfFile],
+                                title: 'Material Receiving Form',
+                                text: 'SourceBlue Receipt Verification Form'
+                            });
+                            showMessage('✓ PDF shared/saved successfully!', 'success');
+                        } catch (shareError) {
+                            if (shareError.name !== 'AbortError') {
+                                // User cancelled share - try fallback
+                                downloadPDFviaBlobLink(pdfBlob, filename);
+                            }
+                        }
+                    } else {
+                        // Fallback for older iOS versions
+                        downloadPDFviaBlobLink(pdfBlob, filename);
+                    }
+                } else if (isSafari) {
+                    // For macOS Safari: use blob link approach
+                    const pdfBlob = pdf.output('blob');
+                    downloadPDFviaBlobLink(pdfBlob, filename);
                 } else {
                     // For other browsers: direct download
                     pdf.save(filename);
