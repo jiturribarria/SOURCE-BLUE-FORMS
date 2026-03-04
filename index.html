@@ -323,19 +323,21 @@
                     <div id="projectDropdown" class="project-dropdown"></div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label for="vendor">Vendor *</label>
-                    <input type="text" id="vendor" required>
+                    <input type="text" id="vendor" autocomplete="off" placeholder="Select a project first..." required readonly>
+                    <div id="vendorDropdown" class="project-dropdown"></div>
                 </div>
 
                 <div class="form-group">
                     <label for="vendorPO">Vendor PO # *</label>
-                    <input type="text" id="vendorPO" required>
+                    <input type="text" id="vendorPO" required readonly placeholder="Auto-filled when vendor is selected">
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label for="equipment">Equipment / Product *</label>
-                    <input type="text" id="equipment" required>
+                    <input type="text" id="equipment" autocomplete="off" placeholder="Select a vendor first..." required readonly>
+                    <div id="equipmentDropdown" class="project-dropdown"></div>
                 </div>
 
                 <div class="row">
@@ -487,20 +489,94 @@
         let uploadedImages = [];
 
         // ============================================
-        // PROJECT DROPDOWN
+        // CASCADING DROPDOWN DATA
         // ============================================
         const PROJECT_OPTIONS = [
             '250860 Sharp Multidisciplinary Clinic Frost',
             '250967 SAN T1RP Phase 1B Equipment'
         ];
 
-        function setupProjectDropdown() {
-            const input = document.getElementById('projectName');
-            const dropdown = document.getElementById('projectDropdown');
+        // Project -> Vendors
+        const PROJECT_VENDORS = {
+            '250860 Sharp Multidisciplinary Clinic Frost': [
+                'Air Treatment Corp.',
+                'Graybar-Lighting',
+                'Graybar-Electrical',
+                'Russel Sigler Inc.',
+                'Norman S Wright'
+            ],
+            '250967 SAN T1RP Phase 1B Equipment': []
+        };
+
+        // Vendor -> PO Number
+        const VENDOR_PO = {
+            'Air Treatment Corp.': '4500026625',
+            'Graybar-Lighting': '4500026619',
+            'Graybar-Electrical': '4500026619',
+            'Russel Sigler Inc.': '4500026736',
+            'Norman S Wright': '4500026749'
+        };
+
+        // Vendor -> Equipment list
+        const VENDOR_EQUIPMENT = {
+            'Air Treatment Corp.': [
+                'AC-1 Rooftop Unit',
+                'AC-1 Isolation Curb',
+                'H-1 Humidifier'
+            ],
+            'Graybar-Lighting': [
+                'P1 (Hard lid)',
+                'R1',
+                'R1-GYP - (Hard lid)',
+                'R2-22 (Hard lid)',
+                'R2-24',
+                'R3-LENGTH (Hard lid)',
+                'R3A-LENGTH',
+                'R4 (Hard lid)',
+                'R5',
+                'R6-A (Hard Lid)',
+                'S1-SO',
+                'S1-HO',
+                'S2-A',
+                'S2-B',
+                'S3 (Hard Lid)',
+                'XC1 (Hard Lid)'
+            ],
+            'Graybar-Electrical': [
+                'PANEL LU',
+                'PANEL LA',
+                'PANEL LB',
+                'PANEL LC',
+                'PANEL IDF',
+                'PANEL HM',
+                'PANEL HL',
+                'UPS PANEL',
+                'PANEL LCP6',
+                'SWITCHBOARD DB6H',
+                'SWITCHBOARD DB6L',
+                'XFMR "T-4"'
+            ],
+            'Russel Sigler Inc.': [
+                'Water Heat Pump WHP 6-2',
+                'Split System CU-1_FC-1_FC-2'
+            ],
+            'Norman S Wright': [
+                'Exhaust Fans EF 1, 2, 3, 4',
+                'VFD Variable Frequency Drive'
+            ]
+        };
+
+        // ============================================
+        // GENERIC DROPDOWN HELPER
+        // ============================================
+        function setupSearchableDropdown(inputId, dropdownId, getOptions, onSelect) {
+            const input = document.getElementById(inputId);
+            const dropdown = document.getElementById(dropdownId);
 
             function renderOptions(filter) {
+                const options = getOptions();
                 const query = (filter || '').toLowerCase();
-                const matches = PROJECT_OPTIONS.filter(opt => opt.toLowerCase().includes(query));
+                const matches = options.filter(opt => opt.toLowerCase().includes(query));
                 dropdown.innerHTML = '';
                 if (matches.length === 0) {
                     dropdown.classList.remove('show');
@@ -513,9 +589,9 @@
                     item.addEventListener('mousedown', function(e) {
                         e.preventDefault();
                         input.value = opt;
-                        document.getElementById('projectNameSelected').value = opt;
                         dropdown.classList.remove('show');
                         input.classList.remove('field-error');
+                        if (onSelect) onSelect(opt);
                     });
                     dropdown.appendChild(item);
                 });
@@ -523,11 +599,12 @@
             }
 
             input.addEventListener('focus', function() {
-                renderOptions(input.value);
+                if (!input.readOnly || getOptions().length > 0) {
+                    renderOptions(input.readOnly ? '' : input.value);
+                }
             });
 
             input.addEventListener('input', function() {
-                document.getElementById('projectNameSelected').value = '';
                 renderOptions(input.value);
             });
 
@@ -537,10 +614,76 @@
         }
 
         // ============================================
+        // CASCADING DROPDOWN SETUP
+        // ============================================
+        let selectedProject = '';
+        let selectedVendor = '';
+
+        function setupCascadingDropdowns() {
+            // Project dropdown
+            setupSearchableDropdown('projectName', 'projectDropdown',
+                function() { return PROJECT_OPTIONS; },
+                function(project) {
+                    selectedProject = project;
+                    // Reset downstream fields
+                    const vendorInput = document.getElementById('vendor');
+                    const poInput = document.getElementById('vendorPO');
+                    const equipInput = document.getElementById('equipment');
+                    vendorInput.value = '';
+                    poInput.value = '';
+                    equipInput.value = '';
+                    selectedVendor = '';
+
+                    const vendors = PROJECT_VENDORS[project] || [];
+                    if (vendors.length > 0) {
+                        vendorInput.readOnly = false;
+                        vendorInput.placeholder = 'Start typing or click to select vendor...';
+                    } else {
+                        vendorInput.readOnly = false;
+                        vendorInput.placeholder = 'Type vendor name...';
+                    }
+                    equipInput.readOnly = true;
+                    equipInput.placeholder = 'Select a vendor first...';
+                    poInput.readOnly = true;
+                    poInput.placeholder = 'Auto-filled when vendor is selected';
+                }
+            );
+
+            // Vendor dropdown
+            setupSearchableDropdown('vendor', 'vendorDropdown',
+                function() { return PROJECT_VENDORS[selectedProject] || []; },
+                function(vendor) {
+                    selectedVendor = vendor;
+                    // Auto-fill PO
+                    const poInput = document.getElementById('vendorPO');
+                    poInput.value = VENDOR_PO[vendor] || '';
+
+                    // Reset and enable equipment
+                    const equipInput = document.getElementById('equipment');
+                    equipInput.value = '';
+                    const equipOptions = VENDOR_EQUIPMENT[vendor] || [];
+                    if (equipOptions.length > 0) {
+                        equipInput.readOnly = false;
+                        equipInput.placeholder = 'Start typing or click to select equipment...';
+                    } else {
+                        equipInput.readOnly = false;
+                        equipInput.placeholder = 'Type equipment name...';
+                    }
+                }
+            );
+
+            // Equipment dropdown
+            setupSearchableDropdown('equipment', 'equipmentDropdown',
+                function() { return VENDOR_EQUIPMENT[selectedVendor] || []; },
+                null
+            );
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         window.addEventListener('load', function() {
-            setupProjectDropdown();
+            setupCascadingDropdowns();
             setupSignature('vendorSignature');
             setupSignature('jvSignature');
             setupSignature('receiverSignature');
