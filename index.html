@@ -124,6 +124,58 @@
             color: #2a6496;
         }
 
+        /* Multi-select Equipment Tags */
+        .equipment-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            min-height: 50px;
+            cursor: text;
+            transition: all 0.3s;
+            background: #fff;
+            align-items: center;
+        }
+        .equipment-tags-container:focus-within {
+            border-color: #4A90C2;
+            box-shadow: 0 0 0 3px rgba(74, 144, 194, 0.1);
+        }
+        .equipment-tags-container.field-error { border-color: #dc3545 !important; }
+        .equipment-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #EAF2F8;
+            color: #2a6496;
+            border: 1px solid #b8d4e8;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .equipment-tag-remove {
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            color: #888;
+            line-height: 1;
+            margin-left: 2px;
+        }
+        .equipment-tag-remove:hover { color: #dc3545; }
+        .equipment-tags-input {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            padding: 4px 2px !important;
+            font-size: 15px;
+            flex: 1;
+            min-width: 120px;
+            background: transparent;
+        }
+
         /* Button Styles */
         .button-container {
             display: flex;
@@ -288,9 +340,9 @@
     <div class="container" id="formContainer">
         <div class="header">
             <div class="logo">
-                <div class="logo-text">Source<span>Blue</span></div>
+                <img src="sourceblue-logo.svg" alt="SourceBlue" style="height: 60px; width: auto;">
             </div>
-            <h1>📦 RECEIPT VERIFICATION FORM</h1>
+            <h1>RECEIPT VERIFICATION FORM</h1>
             <p>Material Receiving &amp; Certification</p>
         </div>
 
@@ -335,8 +387,11 @@
                 </div>
 
                 <div class="form-group" style="position: relative;">
-                    <label for="equipment">Equipment / Product *</label>
-                    <input type="text" id="equipment" autocomplete="off" placeholder="Select a vendor first..." required readonly>
+                    <label for="equipmentInput">Equipment / Product *</label>
+                    <div id="equipmentTagsContainer" class="equipment-tags-container" onclick="document.getElementById('equipmentInput').focus()">
+                        <input type="text" id="equipmentInput" class="equipment-tags-input" autocomplete="off" placeholder="Select a vendor first..." readonly>
+                    </div>
+                    <input type="hidden" id="equipment" value="">
                     <div id="equipmentDropdown" class="project-dropdown"></div>
                 </div>
 
@@ -628,10 +683,8 @@
                     // Reset downstream fields
                     const vendorInput = document.getElementById('vendor');
                     const poInput = document.getElementById('vendorPO');
-                    const equipInput = document.getElementById('equipment');
                     vendorInput.value = '';
                     poInput.value = '';
-                    equipInput.value = '';
                     selectedVendor = '';
 
                     const vendors = PROJECT_VENDORS[project] || [];
@@ -642,8 +695,9 @@
                         vendorInput.readOnly = false;
                         vendorInput.placeholder = 'Type vendor name...';
                     }
-                    equipInput.readOnly = true;
-                    equipInput.placeholder = 'Select a vendor first...';
+                    if (window.resetEquipmentMultiSelect) {
+                        window.resetEquipmentMultiSelect(false);
+                    }
                     poInput.readOnly = true;
                     poInput.placeholder = 'Auto-filled when vendor is selected';
                 }
@@ -658,25 +712,104 @@
                     const poInput = document.getElementById('vendorPO');
                     poInput.value = VENDOR_PO[vendor] || '';
 
-                    // Reset and enable equipment
-                    const equipInput = document.getElementById('equipment');
-                    equipInput.value = '';
-                    const equipOptions = VENDOR_EQUIPMENT[vendor] || [];
-                    if (equipOptions.length > 0) {
-                        equipInput.readOnly = false;
-                        equipInput.placeholder = 'Start typing or click to select equipment...';
-                    } else {
-                        equipInput.readOnly = false;
-                        equipInput.placeholder = 'Type equipment name...';
+                    // Reset and enable equipment multi-select
+                    if (window.resetEquipmentMultiSelect) {
+                        window.resetEquipmentMultiSelect(true);
                     }
                 }
             );
 
-            // Equipment dropdown
-            setupSearchableDropdown('equipment', 'equipmentDropdown',
-                function() { return VENDOR_EQUIPMENT[selectedVendor] || []; },
-                null
-            );
+            // Equipment multi-select dropdown
+            setupEquipmentMultiSelect();
+        }
+
+        // ============================================
+        // EQUIPMENT MULTI-SELECT
+        // ============================================
+        let selectedEquipment = [];
+
+        function setupEquipmentMultiSelect() {
+            const input = document.getElementById('equipmentInput');
+            const dropdown = document.getElementById('equipmentDropdown');
+            const container = document.getElementById('equipmentTagsContainer');
+            const hiddenInput = document.getElementById('equipment');
+
+            function updateHiddenInput() {
+                hiddenInput.value = selectedEquipment.join(', ');
+            }
+
+            function renderTags() {
+                // Remove existing tags
+                container.querySelectorAll('.equipment-tag').forEach(t => t.remove());
+                selectedEquipment.forEach((item, idx) => {
+                    const tag = document.createElement('span');
+                    tag.className = 'equipment-tag';
+                    tag.innerHTML = item + '<span class="equipment-tag-remove" data-idx="' + idx + '">&times;</span>';
+                    container.insertBefore(tag, input);
+                });
+                // Update placeholder
+                input.placeholder = selectedEquipment.length > 0 ? 'Add more...' : (input.readOnly ? 'Select a vendor first...' : 'Start typing or click to select...');
+                updateHiddenInput();
+            }
+
+            // Remove tag on click
+            container.addEventListener('click', function(e) {
+                if (e.target.classList.contains('equipment-tag-remove')) {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    selectedEquipment.splice(idx, 1);
+                    renderTags();
+                }
+            });
+
+            function renderOptions(filter) {
+                const options = (VENDOR_EQUIPMENT[selectedVendor] || []).filter(opt => !selectedEquipment.includes(opt));
+                const query = (filter || '').toLowerCase();
+                const matches = options.filter(opt => opt.toLowerCase().includes(query));
+                dropdown.innerHTML = '';
+                if (matches.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+                matches.forEach(opt => {
+                    const item = document.createElement('div');
+                    item.className = 'project-dropdown-item';
+                    item.textContent = opt;
+                    item.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                        selectedEquipment.push(opt);
+                        input.value = '';
+                        renderTags();
+                        container.classList.remove('field-error');
+                        // Keep dropdown open for more selections
+                        setTimeout(function() { renderOptions(''); }, 10);
+                    });
+                    dropdown.appendChild(item);
+                });
+                dropdown.classList.add('show');
+            }
+
+            input.addEventListener('focus', function() {
+                if (!input.readOnly) {
+                    renderOptions(input.value);
+                }
+            });
+
+            input.addEventListener('input', function() {
+                renderOptions(input.value);
+            });
+
+            input.addEventListener('blur', function() {
+                setTimeout(function() { dropdown.classList.remove('show'); }, 150);
+            });
+
+            // Expose reset function
+            window.resetEquipmentMultiSelect = function(enable) {
+                selectedEquipment = [];
+                input.value = '';
+                input.readOnly = !enable;
+                input.placeholder = enable ? 'Start typing or click to select equipment...' : 'Select a vendor first...';
+                renderTags();
+            };
         }
 
         // ============================================
@@ -838,11 +971,22 @@
                 const value = field.value.trim();
 
                 if (!value) {
-                    field.classList.add('field-error');
-                    isValid = false;
-                    if (!firstInvalid) firstInvalid = field;
+                    // For equipment, highlight the tags container instead
+                    if (fieldId === 'equipment') {
+                        const tagsContainer = document.getElementById('equipmentTagsContainer');
+                        tagsContainer.classList.add('field-error');
+                        isValid = false;
+                        if (!firstInvalid) firstInvalid = document.getElementById('equipmentInput');
+                    } else {
+                        field.classList.add('field-error');
+                        isValid = false;
+                        if (!firstInvalid) firstInvalid = field;
+                    }
                 } else {
                     field.classList.remove('field-error');
+                    if (fieldId === 'equipment') {
+                        document.getElementById('equipmentTagsContainer').classList.remove('field-error');
+                    }
                 }
             });
 
