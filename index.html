@@ -519,7 +519,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="receiverCompany">Receiver Company *</label>
+                    <label for="receiverCompany">Receiver/Installing Subcontractor *</label>
                     <input type="text" id="receiverCompany" required>
                 </div>
 
@@ -582,7 +582,7 @@
                     <h3 style="margin-bottom: 20px; color: #333;">Required Signatures</h3>
 
                     <div class="form-group" id="vendorSignatureGroup">
-                        <label class="signature-label">Vendor/Deliverer Signature *</label>
+                        <label class="signature-label">Truck Driver / Vendor Signature *</label>
                         <div class="signature-box" id="vendorSignatureBox">
                             <canvas id="vendorSignature" class="signature-canvas"></canvas>
                         </div>
@@ -602,7 +602,7 @@
                     </div>
 
                     <div class="form-group" id="gcSignatureGroup">
-                        <label class="signature-label">General Contractor Representative Signature *</label>
+                        <label class="signature-label">General Contractor / Client Signature *</label>
                         <div class="signature-box" id="gcSignatureBox">
                             <canvas id="gcSignature" class="signature-canvas"></canvas>
                         </div>
@@ -622,7 +622,7 @@
                     </div>
 
                     <div class="form-group" id="receiverSignatureGroup">
-                        <label class="signature-label">Receiver Signature *</label>
+                        <label class="signature-label">Receiver / Installing Subcontractor Signature *</label>
                         <div class="signature-box" id="receiverSignatureBox">
                             <canvas id="receiverSignature" class="signature-canvas"></canvas>
                         </div>
@@ -1281,7 +1281,7 @@
                 'Equipment/Product': document.getElementById('equipment').value,
                 'Location': document.getElementById('location').value,
                 'Quantity Pallets/Units': document.getElementById('quantityPallets').value,
-                'Receiver Company': document.getElementById('receiverCompany').value,
+                'Receiver/Installing Subcontractor': document.getElementById('receiverCompany').value,
                 'Contents Match?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
                 'Package Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
                 'Vendor Signer Name': document.getElementById('vendorName').value,
@@ -1392,18 +1392,49 @@
                     heightLeft -= 297;
                 }
 
-                // Add uploaded images on separate pages
+                // Add uploaded images on separate pages (preserve aspect ratio)
                 if (uploadedImages.length > 0) {
                     for (let i = 0; i < uploadedImages.length; i++) {
-                        pdf.addPage();
                         const img = uploadedImages[i];
+
+                        // Load image to get natural dimensions
+                        const naturalSize = await new Promise((resolve) => {
+                            const tempImg = new Image();
+                            tempImg.onload = function() {
+                                resolve({ w: tempImg.naturalWidth, h: tempImg.naturalHeight });
+                            };
+                            tempImg.src = img.data;
+                        });
+
+                        const pageW = 210; // A4 width mm
+                        const pageH = 297; // A4 height mm
+                        const margin = 10;
+                        const headerSpace = 20; // space for "Photo X of Y" text
+                        const availW = pageW - margin * 2;
+                        const availH = pageH - margin - headerSpace;
+
+                        // Scale to fit while preserving aspect ratio
+                        const imgAspect = naturalSize.w / naturalSize.h;
+                        let drawW, drawH;
+                        if (imgAspect > availW / availH) {
+                            // wider than tall — fit to width
+                            drawW = availW;
+                            drawH = availW / imgAspect;
+                        } else {
+                            // taller than wide — fit to height
+                            drawH = availH;
+                            drawW = availH * imgAspect;
+                        }
+
+                        // Center on page
+                        const x = (pageW - drawW) / 2;
+                        const y = headerSpace + (availH - drawH) / 2;
+
+                        pdf.addPage();
                         pdf.setFontSize(12);
                         pdf.setTextColor(100);
-                        pdf.text(`Photo ${i + 1} of ${uploadedImages.length}`, 105, 15, { align: 'center' });
-
-                        const maxWidth = 180;
-                        const maxHeight = 250;
-                        pdf.addImage(img.data, 'JPEG', 15, 25, maxWidth, maxHeight, undefined, 'NONE');
+                        pdf.text(`Photo ${i + 1} of ${uploadedImages.length}`, 105, 12, { align: 'center' });
+                        pdf.addImage(img.data, 'JPEG', x, y, drawW, drawH);
                     }
                 }
 
