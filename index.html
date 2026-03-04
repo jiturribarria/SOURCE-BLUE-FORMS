@@ -439,7 +439,7 @@
     <div class="container" id="formContainer">
         <div class="header">
             <div class="logo">
-                <img src="sourceblue-logo.svg" alt="SourceBlue" style="height: 60px; width: auto;">
+                <img src="sourceblue-logo.svg" alt="SourceBlue" style="height: 60px; width: auto; max-height: 60px; max-width: 300px;">
             </div>
             <h1>RECEIPT VERIFICATION FORM</h1>
             <p>Material Receiving &amp; Certification</p>
@@ -1273,26 +1273,26 @@
                 return ts ? ts.getAttribute('data-timestamp') : '';
             }
             return {
-                'Date': document.getElementById('date').value,
+                'Date of Receipt': document.getElementById('date').value,
                 'Time': document.getElementById('time').value,
-                'Project Name/Number': document.getElementById('projectName').value,
+                'Project Name / Project Number': document.getElementById('projectName').value,
                 'Vendor': document.getElementById('vendor').value,
-                'Vendor PO#': document.getElementById('vendorPO').value,
-                'Equipment/Product': document.getElementById('equipment').value,
-                'Location': document.getElementById('location').value,
-                'Quantity Pallets/Units': document.getElementById('quantityPallets').value,
-                'Receiver/Installing Subcontractor': document.getElementById('receiverCompany').value,
-                'Contents Match?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
-                'Package Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
-                'Vendor Signer Name': document.getElementById('vendorName').value,
-                'Vendor Signed At': getSignatureTime('vendor'),
-                'Vendor Comments': document.getElementById('vendorComment').value,
-                'GC Rep Signer Name': document.getElementById('gcName').value,
-                'GC Rep Signed At': getSignatureTime('gc'),
-                'GC Rep Comments': document.getElementById('gcComment').value,
-                'Receiver Signer Name': document.getElementById('receiverName').value,
-                'Receiver Signed At': getSignatureTime('receiver'),
-                'Receiver Comments': document.getElementById('receiverComment').value,
+                'Vendor PO #': document.getElementById('vendorPO').value,
+                'Equipment / Product': document.getElementById('equipment').value,
+                'Receiving Location': document.getElementById('location').value,
+                'Qty Pallets/Sections/Units': document.getElementById('quantityPallets').value,
+                'Receiver / Installing Subcontractor': document.getElementById('receiverCompany').value,
+                'Contents Match Shipping List?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
+                'Package or Content Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
+                'Truck Driver / Vendor Name': document.getElementById('vendorName').value,
+                'Truck Driver / Vendor Signed At': getSignatureTime('vendor'),
+                'Truck Driver / Vendor Comments': document.getElementById('vendorComment').value,
+                'General Contractor / Client Name': document.getElementById('gcName').value,
+                'General Contractor / Client Signed At': getSignatureTime('gc'),
+                'General Contractor / Client Comments': document.getElementById('gcComment').value,
+                'Receiver / Installer Name': document.getElementById('receiverName').value,
+                'Receiver / Installer Signed At': getSignatureTime('receiver'),
+                'Receiver / Installer Comments': document.getElementById('receiverComment').value,
                 'Photos Attached': uploadedImages.length
             };
         }
@@ -1354,6 +1354,28 @@
                 const { jsPDF } = window.jspdf;
                 const formElement = document.querySelector('.container');
 
+                // Replace SVG logo with rasterized PNG to prevent html2canvas distortion
+                const logoImg = formElement.querySelector('.logo img');
+                const originalLogoSrc = logoImg ? logoImg.src : null;
+                if (logoImg && logoImg.src.endsWith('.svg')) {
+                    await new Promise((resolve) => {
+                        const tempCanvas = document.createElement('canvas');
+                        const logoRect = logoImg.getBoundingClientRect();
+                        tempCanvas.width = logoRect.width * 2;
+                        tempCanvas.height = logoRect.height * 2;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.scale(2, 2);
+                        const tempImg = new Image();
+                        tempImg.onload = function() {
+                            tempCtx.drawImage(tempImg, 0, 0, logoRect.width, logoRect.height);
+                            logoImg.src = tempCanvas.toDataURL('image/png');
+                            resolve();
+                        };
+                        tempImg.onerror = function() { resolve(); };
+                        tempImg.src = logoImg.src;
+                    });
+                }
+
                 // Hide buttons temporarily for capture
                 const buttonContainer = document.querySelector('.button-container');
                 const successMessage = document.getElementById('successMessage');
@@ -1367,8 +1389,11 @@
                     allowTaint: true
                 });
 
-                // Restore buttons
+                // Restore buttons and original logo
                 buttonContainer.style.display = 'flex';
+                if (logoImg && originalLogoSrc) {
+                    logoImg.src = originalLogoSrc;
+                }
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.95);
                 const pdf = new jsPDF({
@@ -1469,57 +1494,39 @@
             try {
                 const formData = collectFormData();
 
-                // Try to read existing file from localStorage
-                let wb;
-                const storedFile = localStorage.getItem(EXCEL_FILENAME);
+                // Clear old data and start fresh
+                localStorage.removeItem(EXCEL_FILENAME);
+                let wb = XLSX.utils.book_new();
 
-                if (storedFile) {
-                    try {
-                        const binaryString = atob(storedFile);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let i = 0; i < binaryString.length; i++) {
-                            bytes[i] = binaryString.charCodeAt(i);
-                        }
-                        wb = XLSX.read(bytes, {type: 'array'});
-                    } catch (e) {
-                        console.warn('Could not read stored file, creating new one');
-                        wb = XLSX.utils.book_new();
-                    }
-                } else {
-                    wb = XLSX.utils.book_new();
-                }
-
-                // Get or create Receiving sheet
-                let ws;
-                if (wb.Sheets && wb.Sheets['Receiving']) {
-                    ws = wb.Sheets['Receiving'];
-                    const existingData = XLSX.utils.sheet_to_json(ws);
-                    const allData = existingData.concat([formData]);
-                    ws = XLSX.utils.json_to_sheet(allData);
-                } else {
-                    ws = XLSX.utils.json_to_sheet([formData]);
-                }
+                // Create Receiving sheet with current form data
+                let ws = XLSX.utils.json_to_sheet([formData]);
 
                 // Set column widths
                 ws['!cols'] = [
-                    {wch: 12}, {wch: 8}, {wch: 25}, {wch: 20}, {wch: 15},
-                    {wch: 30}, {wch: 20}, {wch: 20}, {wch: 15},
-                    {wch: 15}, {wch: 40}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 15}
+                    {wch: 14}, // Date of Receipt
+                    {wch: 8},  // Time
+                    {wch: 28}, // Project Name / Project Number
+                    {wch: 20}, // Vendor
+                    {wch: 15}, // Vendor PO #
+                    {wch: 30}, // Equipment / Product
+                    {wch: 30}, // Receiving Location
+                    {wch: 25}, // Qty Pallets/Sections/Units
+                    {wch: 30}, // Receiver / Installing Subcontractor
+                    {wch: 28}, // Contents Match Shipping List?
+                    {wch: 28}, // Package or Content Damaged?
+                    {wch: 25}, // Truck Driver / Vendor Name
+                    {wch: 22}, // Truck Driver / Vendor Signed At
+                    {wch: 30}, // Truck Driver / Vendor Comments
+                    {wch: 28}, // General Contractor / Client Name
+                    {wch: 22}, // General Contractor / Client Signed At
+                    {wch: 30}, // General Contractor / Client Comments
+                    {wch: 25}, // Receiver / Installer Name
+                    {wch: 22}, // Receiver / Installer Signed At
+                    {wch: 30}, // Receiver / Installer Comments
+                    {wch: 15}  // Photos Attached
                 ];
 
-                if (wb.Sheets && wb.Sheets['Receiving']) {
-                    wb.Sheets['Receiving'] = ws;
-                } else {
-                    XLSX.utils.book_append_sheet(wb, ws, "Receiving");
-                }
-
-                // Save to localStorage for persistence
-                try {
-                    const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'binary'});
-                    localStorage.setItem(EXCEL_FILENAME, btoa(wbout));
-                } catch (e) {
-                    console.warn('Could not save to localStorage:', e);
-                }
+                XLSX.utils.book_append_sheet(wb, ws, "Receiving");
 
                 // Direct download
                 XLSX.writeFile(wb, EXCEL_FILENAME);
