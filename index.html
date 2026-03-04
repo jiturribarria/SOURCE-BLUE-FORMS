@@ -95,6 +95,35 @@
         .checkbox-option input[type="checkbox"] { width: 24px; height: 24px; cursor: pointer; }
         .checkbox-option label { margin: 0; font-weight: 600; cursor: pointer; }
 
+        /* Project Dropdown */
+        .project-dropdown {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 2px solid #4A90C2;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .project-dropdown.show { display: block; }
+        .project-dropdown-item {
+            padding: 12px 14px;
+            cursor: pointer;
+            font-size: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .project-dropdown-item:last-child { border-bottom: none; }
+        .project-dropdown-item:hover,
+        .project-dropdown-item.active {
+            background: #EAF2F8;
+            color: #2a6496;
+        }
+
         /* Button Styles */
         .button-container {
             display: flex;
@@ -287,13 +316,11 @@
             <form id="receivingForm">
                 <h3 class="section-title">General Information</h3>
 
-                <div class="form-group">
-                    <label for="projectName">Project Number / Project Name *</label>
-                    <input type="text" id="projectName" list="projectList" autocomplete="off" placeholder="Start typing project number or name..." required>
-                    <datalist id="projectList">
-                        <option value="250860 Sharp Multidisciplinary Clinic Frost">
-                        <option value="250967 SAN T1RP Phase 1B Equipment">
-                    </datalist>
+                <div class="form-group" style="position: relative;">
+                    <label for="projectName">Project Name / Project Number *</label>
+                    <input type="text" id="projectName" autocomplete="off" placeholder="Start typing project name or number..." required>
+                    <input type="hidden" id="projectNameSelected" value="">
+                    <div id="projectDropdown" class="project-dropdown"></div>
                 </div>
 
                 <div class="form-group">
@@ -460,9 +487,60 @@
         let uploadedImages = [];
 
         // ============================================
+        // PROJECT DROPDOWN
+        // ============================================
+        const PROJECT_OPTIONS = [
+            '250860 Sharp Multidisciplinary Clinic Frost',
+            '250967 SAN T1RP Phase 1B Equipment'
+        ];
+
+        function setupProjectDropdown() {
+            const input = document.getElementById('projectName');
+            const dropdown = document.getElementById('projectDropdown');
+
+            function renderOptions(filter) {
+                const query = (filter || '').toLowerCase();
+                const matches = PROJECT_OPTIONS.filter(opt => opt.toLowerCase().includes(query));
+                dropdown.innerHTML = '';
+                if (matches.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+                matches.forEach(opt => {
+                    const item = document.createElement('div');
+                    item.className = 'project-dropdown-item';
+                    item.textContent = opt;
+                    item.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                        input.value = opt;
+                        document.getElementById('projectNameSelected').value = opt;
+                        dropdown.classList.remove('show');
+                        input.classList.remove('field-error');
+                    });
+                    dropdown.appendChild(item);
+                });
+                dropdown.classList.add('show');
+            }
+
+            input.addEventListener('focus', function() {
+                renderOptions(input.value);
+            });
+
+            input.addEventListener('input', function() {
+                document.getElementById('projectNameSelected').value = '';
+                renderOptions(input.value);
+            });
+
+            input.addEventListener('blur', function() {
+                dropdown.classList.remove('show');
+            });
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         window.addEventListener('load', function() {
+            setupProjectDropdown();
             setupSignature('vendorSignature');
             setupSignature('jvSignature');
             setupSignature('receiverSignature');
@@ -653,7 +731,7 @@
             return {
                 'Date': document.getElementById('date').value,
                 'Time': document.getElementById('time').value,
-                'Project Number/Name': document.getElementById('projectName').value,
+                'Project Name/Number': document.getElementById('projectName').value,
                 'Vendor': document.getElementById('vendor').value,
                 'Vendor PO#': document.getElementById('vendorPO').value,
                 'Equipment/Product': document.getElementById('equipment').value,
