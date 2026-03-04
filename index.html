@@ -1115,6 +1115,29 @@
                     if (place.formatted_address) {
                         locationInput.value = place.formatted_address;
                     }
+                    // Ensure field stays editable after selection
+                    locationInput.removeAttribute('readonly');
+                    locationInput.removeAttribute('disabled');
+                });
+
+                // Prevent Google from ever making the field readonly/disabled
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes') {
+                            if (locationInput.readOnly) locationInput.removeAttribute('readonly');
+                            if (locationInput.disabled) locationInput.removeAttribute('disabled');
+                        }
+                    });
+                });
+                observer.observe(locationInput, { attributes: true, attributeFilter: ['readonly', 'disabled'] });
+
+                // Prevent pac-container click from stealing focus and locking field
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.pac-container') && e.target !== locationInput) {
+                        // Field should remain editable after clicking outside
+                        locationInput.removeAttribute('readonly');
+                        locationInput.removeAttribute('disabled');
+                    }
                 });
             }
         }
