@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&libraries=places&callback=Function.prototype" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -328,6 +329,104 @@
         .validation-error { color: #dc3545; font-size: 12px; margin-top: 5px; }
         .field-error { border-color: #dc3545 !important; }
 
+        /* Signature Lock Styles */
+        .lock-signature-btn {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: 2px solid #28a745;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .lock-signature-btn:hover { background: #218838; border-color: #218838; }
+        .lock-signature-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .signature-box.locked {
+            border-color: #28a745;
+            background: #f8fff8;
+            pointer-events: none;
+        }
+        .signature-box.locked .signature-canvas { cursor: default; }
+        .signature-locked-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.3);
+            z-index: 5;
+        }
+        .signature-timestamp {
+            position: absolute;
+            bottom: 4px;
+            right: 8px;
+            font-size: 11px;
+            color: #28a745;
+            font-weight: 600;
+            z-index: 6;
+            background: rgba(255,255,255,0.8);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Signature Comment Styles */
+        .signature-comment-group {
+            margin-top: 12px;
+            position: relative;
+        }
+        .signature-comment-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+        .signature-comment-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        .signature-comment-input:focus {
+            outline: none;
+            border-color: #4A90C2;
+            box-shadow: 0 0 0 3px rgba(74, 144, 194, 0.1);
+        }
+        .signature-comment-input:disabled {
+            background: #f0f0f0;
+            color: #999;
+        }
+        .no-comment-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .no-comment-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .no-comment-option label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        /* Google Maps Autocomplete Styles */
+        .pac-container { z-index: 10000 !important; }
+        .location-wrapper { position: relative; }
+        .location-wrapper .location-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #4A90C2;
+            font-size: 18px;
+            pointer-events: none;
+        }
+
         @media (max-width: 600px) {
             .row { grid-template-columns: 1fr; }
             .checkbox-group { flex-direction: column; align-items: flex-start; gap: 15px; }
@@ -408,7 +507,10 @@
 
                 <div class="form-group">
                     <label for="location">Receiving Location *</label>
-                    <input type="text" id="location" required>
+                    <div class="location-wrapper">
+                        <input type="text" id="location" required placeholder="Start typing an address..." autocomplete="off">
+                        <span class="location-icon">&#x1F4CD;</span>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -437,7 +539,7 @@
                             <label for="matchNo">NO</label>
                         </div>
                     </div>
-                    <small style="color: #666; font-size: 12px; font-style: italic;">If NO, explain in comments below</small>
+                    <small style="color: #666; font-size: 12px; font-style: italic;">If NO, explain in signature comments below</small>
                 </div>
 
                 <div class="form-group">
@@ -452,12 +554,7 @@
                             <label for="damagedNo">NO</label>
                         </div>
                     </div>
-                    <small style="color: #666; font-size: 12px; font-style: italic;">If YES, notify immediately and provide description in comments</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="comments">Comments</label>
-                    <textarea id="comments" rows="4" placeholder="Enter any additional comments or explanations here..."></textarea>
+                    <small style="color: #666; font-size: 12px; font-style: italic;">If YES, notify immediately and provide description in signature comments</small>
                 </div>
 
                 <div class="certification-text">
@@ -484,37 +581,64 @@
                 <div class="signature-section">
                     <h3 style="margin-bottom: 20px; color: #333;">Required Signatures</h3>
 
-                    <div class="form-group">
+                    <div class="form-group" id="vendorSignatureGroup">
                         <label class="signature-label">Vendor/Deliverer Signature *</label>
-                        <div class="signature-box">
+                        <div class="signature-box" id="vendorSignatureBox">
                             <canvas id="vendorSignature" class="signature-canvas"></canvas>
                         </div>
                         <div class="signature-buttons">
-                            <button type="button" class="clear-signature-btn" onclick="clearSignature('vendorSignature')">Clear</button>
+                            <button type="button" class="clear-signature-btn" id="vendorClearBtn" onclick="clearSignature('vendorSignature')">Clear</button>
+                            <button type="button" class="lock-signature-btn" id="vendorLockBtn" onclick="lockSignature('vendor')">Done</button>
                         </div>
                         <input type="text" placeholder="Print Name" id="vendorName" style="margin-top: 10px;" required>
+                        <div class="signature-comment-group">
+                            <label for="vendorComment">Comments *</label>
+                            <input type="text" id="vendorComment" class="signature-comment-input" placeholder="Enter comments..." required>
+                            <div class="no-comment-option">
+                                <input type="checkbox" id="vendorNoComment" onchange="toggleNoComment('vendor')">
+                                <label for="vendorNoComment">No Comments</label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="signature-label">JV Representative Signature *</label>
-                        <div class="signature-box">
-                            <canvas id="jvSignature" class="signature-canvas"></canvas>
+                    <div class="form-group" id="gcSignatureGroup">
+                        <label class="signature-label">General Contractor Representative Signature *</label>
+                        <div class="signature-box" id="gcSignatureBox">
+                            <canvas id="gcSignature" class="signature-canvas"></canvas>
                         </div>
                         <div class="signature-buttons">
-                            <button type="button" class="clear-signature-btn" onclick="clearSignature('jvSignature')">Clear</button>
+                            <button type="button" class="clear-signature-btn" id="gcClearBtn" onclick="clearSignature('gcSignature')">Clear</button>
+                            <button type="button" class="lock-signature-btn" id="gcLockBtn" onclick="lockSignature('gc')">Done</button>
                         </div>
-                        <input type="text" placeholder="Print Name" id="jvName" style="margin-top: 10px;" required>
+                        <input type="text" placeholder="Print Name" id="gcName" style="margin-top: 10px;" required>
+                        <div class="signature-comment-group">
+                            <label for="gcComment">Comments *</label>
+                            <input type="text" id="gcComment" class="signature-comment-input" placeholder="Enter comments..." required>
+                            <div class="no-comment-option">
+                                <input type="checkbox" id="gcNoComment" onchange="toggleNoComment('gc')">
+                                <label for="gcNoComment">No Comments</label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" id="receiverSignatureGroup">
                         <label class="signature-label">Receiver Signature *</label>
-                        <div class="signature-box">
+                        <div class="signature-box" id="receiverSignatureBox">
                             <canvas id="receiverSignature" class="signature-canvas"></canvas>
                         </div>
                         <div class="signature-buttons">
-                            <button type="button" class="clear-signature-btn" onclick="clearSignature('receiverSignature')">Clear</button>
+                            <button type="button" class="clear-signature-btn" id="receiverClearBtn" onclick="clearSignature('receiverSignature')">Clear</button>
+                            <button type="button" class="lock-signature-btn" id="receiverLockBtn" onclick="lockSignature('receiver')">Done</button>
                         </div>
                         <input type="text" placeholder="Print Name" id="receiverName" style="margin-top: 10px;" required>
+                        <div class="signature-comment-group">
+                            <label for="receiverComment">Comments *</label>
+                            <input type="text" id="receiverComment" class="signature-comment-input" placeholder="Enter comments..." required>
+                            <div class="no-comment-option">
+                                <input type="checkbox" id="receiverNoComment" onchange="toggleNoComment('receiver')">
+                                <label for="receiverNoComment">No Comments</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -813,13 +937,19 @@
         }
 
         // ============================================
+        // SIGNATURE LOCK STATE
+        // ============================================
+        const signatureLocked = { vendor: false, gc: false, receiver: false };
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         window.addEventListener('load', function() {
             setupCascadingDropdowns();
             setupSignature('vendorSignature');
-            setupSignature('jvSignature');
+            setupSignature('gcSignature');
             setupSignature('receiverSignature');
+            setupGooglePlacesAutocomplete();
 
             // Set current date and time
             document.getElementById('date').valueAsDate = new Date();
@@ -861,6 +991,8 @@
 
             function startDrawing(e) {
                 e.preventDefault();
+                const prefix = canvasId.replace('Signature', '');
+                if (signatureLocked[prefix]) return;
                 isDrawing = true;
                 const pos = getPos(e);
                 lastX = pos.x;
@@ -895,9 +1027,96 @@
         }
 
         function clearSignature(canvasId) {
+            // Determine prefix from canvasId
+            const prefix = canvasId.replace('Signature', '');
+            if (signatureLocked[prefix]) return;
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function isSignatureEmpty(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (let i = 3; i < pixelData.length; i += 4) {
+                if (pixelData[i] > 0) return false;
+            }
+            return true;
+        }
+
+        function lockSignature(prefix) {
+            const canvasId = prefix + 'Signature';
+            if (isSignatureEmpty(canvasId)) {
+                showMessage('Please sign before clicking Done.', 'error');
+                return;
+            }
+            const nameInput = document.getElementById(prefix + 'Name');
+            if (!nameInput.value.trim()) {
+                showMessage('Please enter your printed name before clicking Done.', 'error');
+                nameInput.focus();
+                return;
+            }
+
+            signatureLocked[prefix] = true;
+
+            // Lock the signature box
+            const box = document.getElementById(prefix + 'SignatureBox');
+            box.classList.add('locked');
+            const overlay = document.createElement('div');
+            overlay.className = 'signature-locked-overlay';
+            box.appendChild(overlay);
+
+            // Add timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleString('en-US', {
+                month: '2-digit', day: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            const timestamp = document.createElement('div');
+            timestamp.className = 'signature-timestamp';
+            timestamp.textContent = 'Signed: ' + timeStr;
+            timestamp.setAttribute('data-timestamp', now.toISOString());
+            box.appendChild(timestamp);
+
+            // Disable clear/done buttons and name input
+            document.getElementById(prefix + 'ClearBtn').disabled = true;
+            document.getElementById(prefix + 'LockBtn').disabled = true;
+            nameInput.readOnly = true;
+            nameInput.style.background = '#f0f0f0';
+        }
+
+        function toggleNoComment(prefix) {
+            const checkbox = document.getElementById(prefix + 'NoComment');
+            const input = document.getElementById(prefix + 'Comment');
+            if (checkbox.checked) {
+                input.value = 'No Comments';
+                input.disabled = true;
+                input.classList.remove('field-error');
+            } else {
+                input.value = '';
+                input.disabled = false;
+                input.focus();
+            }
+        }
+
+        // ============================================
+        // GOOGLE PLACES AUTOCOMPLETE
+        // ============================================
+        function setupGooglePlacesAutocomplete() {
+            const locationInput = document.getElementById('location');
+            if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+                const autocomplete = new google.maps.places.Autocomplete(locationInput, {
+                    types: ['address'],
+                    componentRestrictions: { country: 'us' }
+                });
+                autocomplete.addListener('place_changed', function() {
+                    const place = autocomplete.getPlace();
+                    if (place.formatted_address) {
+                        locationInput.value = place.formatted_address;
+                    }
+                });
+            }
         }
 
         // ============================================
@@ -960,7 +1179,8 @@
             const requiredFields = [
                 'projectName', 'vendor', 'vendorPO', 'equipment',
                 'date', 'location', 'quantityPallets', 'receiverCompany',
-                'vendorName', 'jvName', 'receiverName'
+                'vendorName', 'gcName', 'receiverName',
+                'vendorComment', 'gcComment', 'receiverComment'
             ];
 
             let isValid = true;
@@ -971,7 +1191,6 @@
                 const value = field.value.trim();
 
                 if (!value) {
-                    // For equipment, highlight the tags container instead
                     if (fieldId === 'equipment') {
                         const tagsContainer = document.getElementById('equipmentTagsContainer');
                         tagsContainer.classList.add('field-error');
@@ -1003,9 +1222,18 @@
                 isValid = false;
             }
 
+            // Check all signatures are locked
+            if (!signatureLocked.vendor || !signatureLocked.gc || !signatureLocked.receiver) {
+                isValid = false;
+                if (!firstInvalid) {
+                    showMessage('All signatures must be completed and locked (click Done) before downloading.', 'error');
+                    return false;
+                }
+            }
+
             if (!isValid && firstInvalid) {
                 firstInvalid.focus();
-                showMessage('Please fill in all required fields.', 'error');
+                showMessage('Please fill in all required fields and lock all signatures.', 'error');
             }
 
             return isValid;
@@ -1015,6 +1243,12 @@
         // COLLECT FORM DATA
         // ============================================
         function collectFormData() {
+            // Get signature timestamps
+            function getSignatureTime(prefix) {
+                const box = document.getElementById(prefix + 'SignatureBox');
+                const ts = box.querySelector('.signature-timestamp');
+                return ts ? ts.getAttribute('data-timestamp') : '';
+            }
             return {
                 'Date': document.getElementById('date').value,
                 'Time': document.getElementById('time').value,
@@ -1027,10 +1261,15 @@
                 'Receiver Company': document.getElementById('receiverCompany').value,
                 'Contents Match?': document.getElementById('matchYes').checked ? 'YES' : (document.getElementById('matchNo').checked ? 'NO' : ''),
                 'Package Damaged?': document.getElementById('damagedYes').checked ? 'YES' : (document.getElementById('damagedNo').checked ? 'NO' : ''),
-                'Comments': document.getElementById('comments').value,
                 'Vendor Signer Name': document.getElementById('vendorName').value,
-                'JV Rep Signer Name': document.getElementById('jvName').value,
+                'Vendor Signed At': getSignatureTime('vendor'),
+                'Vendor Comments': document.getElementById('vendorComment').value,
+                'GC Rep Signer Name': document.getElementById('gcName').value,
+                'GC Rep Signed At': getSignatureTime('gc'),
+                'GC Rep Comments': document.getElementById('gcComment').value,
                 'Receiver Signer Name': document.getElementById('receiverName').value,
+                'Receiver Signed At': getSignatureTime('receiver'),
+                'Receiver Comments': document.getElementById('receiverComment').value,
                 'Photos Attached': uploadedImages.length
             };
         }
@@ -1246,6 +1485,21 @@
         // RESET FORM (Optional utility)
         // ============================================
         function resetForm() {
+            // Unlock signatures first
+            ['vendor', 'gc', 'receiver'].forEach(prefix => {
+                signatureLocked[prefix] = false;
+                const box = document.getElementById(prefix + 'SignatureBox');
+                box.classList.remove('locked');
+                const overlay = box.querySelector('.signature-locked-overlay');
+                if (overlay) overlay.remove();
+                const ts = box.querySelector('.signature-timestamp');
+                if (ts) ts.remove();
+                document.getElementById(prefix + 'ClearBtn').disabled = false;
+                document.getElementById(prefix + 'LockBtn').disabled = false;
+                const nameInput = document.getElementById(prefix + 'Name');
+                nameInput.readOnly = false;
+                nameInput.style.background = '';
+            });
             document.getElementById('receivingForm').reset();
             document.getElementById('date').valueAsDate = new Date();
             const now = new Date();
@@ -1253,7 +1507,7 @@
                 now.getHours().toString().padStart(2, '0') + ':' +
                 now.getMinutes().toString().padStart(2, '0');
             clearSignature('vendorSignature');
-            clearSignature('jvSignature');
+            clearSignature('gcSignature');
             clearSignature('receiverSignature');
             uploadedImages = [];
             displayImages();
