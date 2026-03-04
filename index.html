@@ -288,8 +288,12 @@
                 <h3 class="section-title">General Information</h3>
 
                 <div class="form-group">
-                    <label for="projectName">Project Name *</label>
-                    <input type="text" id="projectName" required>
+                    <label for="projectName">Project Number / Project Name *</label>
+                    <input type="text" id="projectName" list="projectList" autocomplete="off" placeholder="Start typing project number or name..." required>
+                    <datalist id="projectList">
+                        <option value="250860 Sharp Multidisciplinary Clinic Frost">
+                        <option value="250967 SAN T1RP Phase 1B Equipment">
+                    </datalist>
                 </div>
 
                 <div class="form-group">
@@ -649,7 +653,7 @@
             return {
                 'Date': document.getElementById('date').value,
                 'Time': document.getElementById('time').value,
-                'Project Name': document.getElementById('projectName').value,
+                'Project Number/Name': document.getElementById('projectName').value,
                 'Vendor': document.getElementById('vendor').value,
                 'Vendor PO#': document.getElementById('vendorPO').value,
                 'Equipment/Product': document.getElementById('equipment').value,
